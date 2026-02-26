@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bank Mule Detection – Analytics Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#080c10;--bg2:#0d1117;--card:#111720;--accent:#00d4ff;--accent2:#00ff9d;--red:#ff4d6d;--yellow:#ffd166;--orange:#ff8c42;--text:#e8edf2;--muted:#6b7a8d;--border:rgba(0,212,255,0.15);}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;}
+
+header{background:var(--bg2);border-bottom:1px solid var(--border);padding:1.2rem 2rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;}
+.header-title{font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:3px;color:var(--accent);}
+.header-sub{font-family:'Space Mono',monospace;font-size:0.62rem;color:var(--muted);letter-spacing:2px;text-align:right;}
+.header-links{display:flex;gap:0.8rem;align-items:center;flex-wrap:wrap;}
+
+/* Nav links — all open in new tab, work reliably */
+.nav-link{
+  font-family:'Space Mono',monospace;font-size:0.65rem;letter-spacing:1.5px;
+  padding:0.42rem 1rem;border-radius:5px;text-decoration:none;
+  border:1px solid rgba(0,212,255,0.25);color:var(--muted);
+  transition:all 0.18s;display:inline-block;
+}
+.nav-link:hover{color:var(--accent);border-color:var(--accent);}
+.nav-link.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000 !important;border:none;font-weight:700;}
+.nav-link.primary:hover{opacity:0.88;}
+
+main{padding:2rem;max-width:1400px;margin:0 auto;}
+.filters{display:flex;gap:1rem;margin-bottom:2rem;flex-wrap:wrap;align-items:center;background:var(--card);padding:1rem 1.5rem;border-radius:10px;border:1px solid var(--border);}
+.filter-label{font-family:'Space Mono',monospace;font-size:0.65rem;color:var(--muted);letter-spacing:2px;}
+select{background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:0.5rem 1rem;border-radius:6px;font-family:'Space Mono',monospace;font-size:0.7rem;cursor:pointer;outline:none;transition:border-color 0.2s;}
+select:hover,select:focus{border-color:var(--accent);}
+
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:1rem;margin-bottom:2rem;}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.2rem 1.4rem;position:relative;overflow:hidden;transition:transform 0.2s;}
+.kpi:hover{transform:translateY(-2px);}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.kpi.c1::before{background:var(--accent);}
+.kpi.c2::before{background:var(--red);}
+.kpi.c3::before{background:var(--accent2);}
+.kpi.c4::before{background:var(--yellow);}
+.kpi.c5::before{background:var(--orange);}
+.kpi-label{font-family:'Space Mono',monospace;font-size:0.58rem;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:0.4rem;}
+.kpi-value{font-family:'Bebas Neue',sans-serif;font-size:2.1rem;line-height:1;margin-bottom:0.2rem;}
+.kpi.c1 .kpi-value{color:var(--accent);}
+.kpi.c2 .kpi-value{color:var(--red);}
+.kpi.c3 .kpi-value{color:var(--accent2);}
+.kpi.c4 .kpi-value{color:var(--yellow);}
+.kpi.c5 .kpi-value{color:var(--orange);}
+.kpi-sub{font-size:0.75rem;color:var(--muted);}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem;}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.5rem;margin-bottom:1.5rem;}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.5rem;}
+.chart-title{font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;margin-bottom:0.3rem;}
+.chart-sub{font-family:'Space Mono',monospace;font-size:0.58rem;color:var(--muted);letter-spacing:1px;margin-bottom:1rem;}
+.chart-wrap{position:relative;height:240px;}
+.chart-wrap.tall{height:300px;}
+
+table{width:100%;border-collapse:collapse;}
+th{font-family:'Space Mono',monospace;font-size:0.58rem;letter-spacing:2px;color:var(--muted);text-transform:uppercase;padding:0.7rem 1rem;border-bottom:1px solid var(--border);text-align:left;}
+td{padding:0.65rem 1rem;border-bottom:1px solid rgba(255,255,255,0.04);font-size:0.82rem;}
+tr:hover td{background:rgba(0,212,255,0.03);}
+.tag{display:inline-block;padding:0.18rem 0.55rem;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.58rem;}
+.tag.mule{background:rgba(255,77,109,0.15);color:var(--red);}
+.tag.legit{background:rgba(0,255,157,0.12);color:var(--accent2);}
+.tag.sus{background:rgba(255,209,102,0.12);color:var(--yellow);}
+.conf-bar-bg{background:rgba(255,255,255,0.07);border-radius:3px;height:4px;width:80px;display:inline-block;vertical-align:middle;margin-left:6px;}
+.conf-bar{height:4px;border-radius:3px;}
+
+.model-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-top:1rem;}
+.mm{background:var(--bg2);border-radius:8px;padding:0.8rem 1rem;text-align:center;}
+.mm-val{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;color:var(--accent2);}
+.mm-lbl{font-family:'Space Mono',monospace;font-size:0.58rem;color:var(--muted);letter-spacing:1px;}
+
+.cm-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-top:0.8rem;}
+.cm-cell{border-radius:8px;padding:1rem;text-align:center;}
+.cm-tp{background:rgba(0,255,157,0.12);border:1px solid rgba(0,255,157,0.2);}
+.cm-tn{background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.15);}
+.cm-fp{background:rgba(255,209,102,0.08);border:1px solid rgba(255,209,102,0.2);}
+.cm-fn{background:rgba(255,77,109,0.1);border:1px solid rgba(255,77,109,0.2);}
+.cm-num{font-family:'Bebas Neue',sans-serif;font-size:2rem;line-height:1;}
+.cm-lbl{font-family:'Space Mono',monospace;font-size:0.58rem;color:var(--muted);letter-spacing:1px;margin-top:0.2rem;}
+.cm-corner{font-family:'Space Mono',monospace;font-size:0.58rem;color:var(--muted);letter-spacing:1px;padding:0.3rem;}
+
+@media(max-width:900px){
+  .kpi-row{grid-template-columns:repeat(2,1fr);}
+  .grid2,.grid3{grid-template-columns:1fr;}
+  header{flex-direction:column;align-items:flex-start;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <!-- LEFT: back link -->
+  <div>
+    <a href="https://kamala1205.github.io" target="_blank" class="nav-link">← Portfolio</a>
+  </div>
+
+  <!-- CENTER: title -->
+  <div class="header-title">🛡 BANK MULE DETECTION – ANALYTICS</div>
+
+  <!-- RIGHT: nav links -->
+  <div class="header-links">
+    <a href="https://github.com/kamala1205/bank-mule-detection" target="_blank" class="nav-link">⌥ GitHub</a>
+    <a href="https://kamala1205.github.io" target="_blank" class="nav-link">🌐 Portfolio</a>
+    <a href="https://share.streamlit.io" target="_blank" class="nav-link primary">▶ Live App</a>
+    <div class="header-sub">KAMALAKANTA BEHERA<br>ML PROJECT · 2024</div>
+  </div>
+</header>
+
+<main>
+  <!-- FILTERS -->
+  <div class="filters">
+    <span class="filter-label">Filter by:</span>
+    <select id="f_model">
+      <option value="all">All Models</option>
+      <option value="rf">Random Forest</option>
+      <option value="lr">Logistic Regression</option>
+      <option value="dt">Decision Tree</option>
+      <option value="svm">SVM</option>
+    </select>
+    <select id="f_period">
+      <option value="all">All Time</option>
+      <option value="Q1">Q1 2024</option>
+      <option value="Q2">Q2 2024</option>
+      <option value="Q3">Q3 2024</option>
+      <option value="Q4">Q4 2024</option>
+    </select>
+    <select id="f_risk">
+      <option value="all">All Risk Levels</option>
+      <option value="mule">Mule</option>
+      <option value="suspicious">Suspicious</option>
+      <option value="legit">Legitimate</option>
+    </select>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-row">
+    <div class="kpi c1"><div class="kpi-label">Accounts Analyzed</div><div class="kpi-value" id="k1">15,420</div><div class="kpi-sub">Total records</div></div>
+    <div class="kpi c2"><div class="kpi-label">Mules Detected</div><div class="kpi-value" id="k2">1,284</div><div class="kpi-sub" id="k2s">8.3% of total</div></div>
+    <div class="kpi c4"><div class="kpi-label">Suspicious</div><div class="kpi-value" id="k3">2,106</div><div class="kpi-sub" id="k3s">13.7% flagged</div></div>
+    <div class="kpi c3"><div class="kpi-label">Model Accuracy</div><div class="kpi-value" id="k4">96.4%</div><div class="kpi-sub">Ensemble F1: 94.0%</div></div>
+    <div class="kpi c5"><div class="kpi-label">Fraud Prevented</div><div class="kpi-value" id="k5">₹4.2Cr</div><div class="kpi-sub">Est. amount blocked</div></div>
+  </div>
+
+  <!-- ROW 1: Trend + Distribution -->
+  <div class="grid2">
+    <div class="chart-card">
+      <div class="chart-title">MONTHLY DETECTION TREND</div>
+      <div class="chart-sub">Mule vs Suspicious accounts detected per month</div>
+      <div class="chart-wrap tall"><canvas id="cTrend"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">CLASS DISTRIBUTION</div>
+      <div class="chart-sub">Overall breakdown of account classifications</div>
+      <div class="chart-wrap tall"><canvas id="cDist"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ROW 2: Feature importance + Model comparison -->
+  <div class="grid2">
+    <div class="chart-card">
+      <div class="chart-title">FEATURE IMPORTANCE</div>
+      <div class="chart-sub">Top predictors from Random Forest model</div>
+      <div class="chart-wrap"><canvas id="cFeat"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">MODEL PERFORMANCE COMPARISON</div>
+      <div class="chart-sub">Accuracy, Precision, Recall, F1 by model</div>
+      <div class="chart-wrap"><canvas id="cModel"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ROW 3: Risk score + Account age -->
+  <div class="grid2">
+    <div class="chart-card">
+      <div class="chart-title">RISK SCORE DISTRIBUTION</div>
+      <div class="chart-sub">How accounts spread across risk levels</div>
+      <div class="chart-wrap"><canvas id="cRisk"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">MULE RATE BY ACCOUNT AGE</div>
+      <div class="chart-sub">Newer accounts show significantly higher mule rate</div>
+      <div class="chart-wrap"><canvas id="cAge"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ROW 4: Confusion matrix + Metrics + Indicators -->
+  <div class="grid3">
+    <div class="chart-card">
+      <div class="chart-title">CONFUSION MATRIX</div>
+      <div class="chart-sub" id="cmSub">Random Forest (best model)</div>
+      <div style="display:grid;grid-template-columns:auto 1fr 1fr;gap:4px;margin-top:0.5rem;">
+        <div></div>
+        <div class="cm-corner" style="text-align:center;">Pred: MULE</div>
+        <div class="cm-corner" style="text-align:center;">Pred: LEGIT</div>
+        <div class="cm-corner" style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:0.55rem;padding:0.5rem;">Actual: MULE</div>
+        <div class="cm-cell cm-tp"><div class="cm-num" id="cmTP" style="color:var(--accent2)">1,196</div><div class="cm-lbl">TRUE POS</div></div>
+        <div class="cm-cell cm-fn"><div class="cm-num" id="cmFN" style="color:var(--red)">88</div><div class="cm-lbl">FALSE NEG</div></div>
+        <div class="cm-corner" style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:0.55rem;padding:0.5rem;">Actual: LEGIT</div>
+        <div class="cm-cell cm-fp"><div class="cm-num" id="cmFP" style="color:var(--yellow)">64</div><div class="cm-lbl">FALSE POS</div></div>
+        <div class="cm-cell cm-tn"><div class="cm-num" id="cmTN" style="color:var(--accent)">14,072</div><div class="cm-lbl">TRUE NEG</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">MODEL METRICS BREAKDOWN</div>
+      <div class="chart-sub" id="metSub">Ensemble performance</div>
+      <div class="model-metrics" id="modelMetrics">
+        <div class="mm"><div class="mm-val" id="mAcc">96.4%</div><div class="mm-lbl">Accuracy</div></div>
+        <div class="mm"><div class="mm-val" id="mPre">94.8%</div><div class="mm-lbl">Precision</div></div>
+        <div class="mm"><div class="mm-val" id="mRec">93.2%</div><div class="mm-lbl">Recall</div></div>
+        <div class="mm"><div class="mm-val" id="mF1">94.0%</div><div class="mm-lbl">F1 Score</div></div>
+      </div>
+      <div style="margin-top:1.2rem;">
+        <div class="chart-wrap" style="height:120px;"><canvas id="cROC"></canvas></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">TOP MULE INDICATORS</div>
+      <div class="chart-sub">Accounts flagged by key risk signals</div>
+      <div class="chart-wrap"><canvas id="cIndicators"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ROW 5: Flagged accounts table -->
+  <div class="chart-card" style="margin-top:0;">
+    <div class="chart-title">RECENTLY FLAGGED ACCOUNTS</div>
+    <div class="chart-sub" style="margin-bottom:1rem;">High-confidence mule detections requiring immediate review</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Account ID</th><th>Risk Score</th><th>Classification</th>
+          <th>Pass-Through</th><th>Account Age</th><th>KYC</th>
+          <th>Txn Count</th><th>Confidence</th>
+        </tr>
+      </thead>
+      <tbody id="flaggedTbl"></tbody>
+    </table>
+  </div>
+
+  <!-- FOOTER with working links -->
+  <div style="margin-top:2.5rem;padding-top:1.2rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+    <div style="font-family:'Space Mono',monospace;font-size:0.62rem;color:var(--muted);">
+      Built by <span style="color:var(--accent)">Kamalakanta Behera</span> · MCA Final Year · Data Analyst
+    </div>
+    <div style="display:flex;gap:1rem;">
+      <a href="https://kamala1205.github.io" target="_blank" class="nav-link">🌐 Portfolio</a>
+      <a href="https://github.com/kamala1205/bank-mule-detection" target="_blank" class="nav-link">⌥ GitHub</a>
+    </div>
+  </div>
+</main>
+
+<script>
+const SCALE={x:{ticks:{color:'#6b7a8d',font:{family:'Space Mono',size:9}},grid:{color:'rgba(255,255,255,0.05)'}},y:{ticks:{color:'#6b7a8d',font:{family:'Space Mono',size:9}},grid:{color:'rgba(255,255,255,0.05)'}}};
+const LEG={labels:{color:'#6b7a8d',font:{family:'Space Mono',size:10}}};
+const OPT={responsive:true,maintainAspectRatio:false};
+
+const DB={
+  kpi:{
+    all: {total:15420,mules:1284,sus:2106,acc:'96.4%',fraud:'₹4.2Cr'},
+    rf:  {total:15420,mules:1248,sus:2040,acc:'96.4%',fraud:'₹4.1Cr'},
+    lr:  {total:15420,mules:1180,sus:1960,acc:'92.8%',fraud:'₹3.8Cr'},
+    dt:  {total:15420,mules:1320,sus:2180,acc:'93.6%',fraud:'₹4.3Cr'},
+    svm: {total:15420,mules:1200,sus:2000,acc:'91.2%',fraud:'₹3.9Cr'},
+    Q1:  {total:3640, mules:286, sus:490, acc:'95.8%',fraud:'₹0.9Cr'},
+    Q2:  {total:3820, mules:318, sus:528, acc:'96.1%',fraud:'₹1.0Cr'},
+    Q3:  {total:4120, mules:372, sus:602, acc:'96.6%',fraud:'₹1.2Cr'},
+    Q4:  {total:3840, mules:308, sus:486, acc:'96.8%',fraud:'₹1.1Cr'},
+    mule:{total:1284, mules:1284,sus:0,   acc:'96.4%',fraud:'₹4.2Cr'},
+    suspicious:{total:2106,mules:0,sus:2106,acc:'96.4%',fraud:'₹1.8Cr'},
+    legit:{total:12030,mules:0,sus:0,      acc:'96.4%',fraud:'₹0Cr'},
+  },
+  trend:{
+    all:{mule:[82,96,104,88,112,128,118,108,124,132,116,176],sus:[124,140,162,148,168,186,172,160,184,192,168,202]},
+    Q1: {mule:[82,96,108],sus:[124,140,162]},
+    Q2: {mule:[88,112,118],sus:[148,168,186]},
+    Q3: {mule:[108,124,140],sus:[160,184,202]},
+    Q4: {mule:[132,116,176],sus:[192,168,202]},
+  },
+  trendLabels:{
+    all:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+    Q1:['Jan','Feb','Mar'],Q2:['Apr','May','Jun'],Q3:['Jul','Aug','Sep'],Q4:['Oct','Nov','Dec']
+  },
+  dist:{
+    all:[1284,2106,12030],mule:[1284,0,0],suspicious:[0,2106,0],legit:[0,0,12030],
+    rf:[1248,2040,12132],lr:[1180,1960,12280],dt:[1320,2180,11920],svm:[1200,2000,12220],
+    Q1:[286,490,2864],Q2:[318,528,2974],Q3:[372,602,3146],Q4:[308,486,3046],
+  },
+  feat:{
+    all:{labels:['Pass-Through Ratio','KYC Status','Account Age','Phone Changes','Night Transactions','Txn Velocity','Round Amounts','Intl Transactions','Failed Txns','Unique Receivers'],vals:[0.28,0.22,0.14,0.12,0.08,0.06,0.04,0.03,0.02,0.01]},
+    rf: {labels:['Pass-Through Ratio','KYC Status','Account Age','Phone Changes','Night Transactions','Txn Velocity','Round Amounts','Intl Transactions'],vals:[0.31,0.24,0.16,0.13,0.07,0.05,0.03,0.01]},
+    lr: {labels:['KYC Status','Pass-Through Ratio','Account Age','Phone Changes','Txn Count','Night Transactions','Complaints','Intl Txns'],vals:[0.26,0.24,0.18,0.14,0.08,0.05,0.03,0.02]},
+    dt: {labels:['Pass-Through Ratio','Account Age','KYC Status','Txn Count','Phone Changes','Night Txns','Round Amounts','Failed Txns'],vals:[0.34,0.22,0.18,0.10,0.08,0.04,0.02,0.02]},
+    svm:{labels:['Pass-Through Ratio','KYC Status','Phone Changes','Account Age','Night Txns','Round Amounts','Txn Velocity','Complaints'],vals:[0.30,0.22,0.20,0.14,0.06,0.04,0.02,0.02]},
+  },
+  modelPerf:{
+    labels:['Random Forest','Logistic Reg.','Decision Tree','SVM'],
+    accuracy:[96.4,92.8,93.6,91.2],precision:[94.8,90.2,91.4,89.6],recall:[93.2,88.8,94.2,87.4],f1:[94.0,89.4,92.8,88.5]
+  },
+  risk:{
+    all:{labels:['0-10','11-20','21-30','31-40','41-50','51-60','61-70','71-80','81-90','91-100'],legit:[4820,3640,2280,840,296,84,36,18,8,8],mule:[4,8,12,28,56,96,188,284,360,248]},
+    mule:{labels:['61-70','71-80','81-90','91-100'],legit:[0,0,0,0],mule:[188,284,360,464]},
+    legit:{labels:['0-10','11-20','21-30','31-40','41-50'],legit:[4820,3640,2280,840,450],mule:[0,0,0,0,0]},
+  },
+  age:{
+    all:{labels:['0-3mo','3-6mo','6-12mo','1-2yr','2-3yr','3-5yr','5yr+'],muleRate:[42,28,18,9,4,2,1]},
+  },
+  cm:{
+    all:{tp:1196,fn:88,fp:64,tn:14072,label:'Random Forest (best model)'},
+    rf: {tp:1196,fn:88,fp:64,tn:14072,label:'Random Forest'},
+    lr: {tp:1100,fn:180,fp:110,tn:14030,label:'Logistic Regression'},
+    dt: {tp:1240,fn:80,fp:148,tn:13952,label:'Decision Tree'},
+    svm:{tp:1116,fn:168,fp:96,tn:14040,label:'SVM'},
+  },
+  metrics:{
+    all:{acc:'96.4%',pre:'94.8%',rec:'93.2%',f1:'94.0%',label:'Ensemble'},
+    rf: {acc:'96.4%',pre:'94.9%',rec:'93.2%',f1:'94.0%',label:'Random Forest'},
+    lr: {acc:'92.8%',pre:'90.9%',rec:'85.9%',f1:'88.3%',label:'Logistic Regression'},
+    dt: {acc:'93.6%',pre:'89.3%',rec:'93.9%',f1:'91.5%',label:'Decision Tree'},
+    svm:{acc:'91.2%',pre:'92.1%',rec:'86.9%',f1:'89.4%',label:'SVM'},
+  },
+  indicators:{
+    all:{labels:['Pass-Through >70%','KYC Unverified','Acct Age <3mo','Phone Changes ≥3','Night Txns >60%','Round Amounts >70%'],vals:[680,540,420,310,280,240]},
+    mule:{labels:['Pass-Through >70%','KYC Unverified','Acct Age <3mo','Phone Changes ≥3','Night Txns >60%','Round Amounts >70%'],vals:[920,740,620,480,420,380]},
+    suspicious:{labels:['Pass-Through >70%','KYC Partial','Acct Age <6mo','Phone Changes ≥2','Night Txns >40%','Round Amounts >50%'],vals:[480,620,540,380,320,280]},
+    legit:{labels:['Pass-Through <20%','KYC Verified','Acct Age >2yr','No Phone Changes','Night Txns <10%','Low Round Amounts'],vals:[8420,9640,7820,11240,10480,9820]},
+  },
+  rows:{
+    all:[
+      {id:'ACC-8821',score:94,cls:'mule',pt:'88%',age:'2mo',kyc:'Partial',txn:82,conf:97},
+      {id:'ACC-7340',score:91,cls:'mule',pt:'82%',age:'1mo',kyc:'Unverified',txn:126,conf:96},
+      {id:'ACC-9012',score:88,cls:'mule',pt:'76%',age:'3mo',kyc:'Partial',txn:64,conf:94},
+      {id:'ACC-6654',score:84,cls:'mule',pt:'71%',age:'4mo',kyc:'Verified',txn:48,conf:91},
+      {id:'ACC-5521',score:78,cls:'mule',pt:'68%',age:'2mo',kyc:'Unverified',txn:94,conf:89},
+      {id:'ACC-4812',score:54,cls:'sus',pt:'46%',age:'6mo',kyc:'Partial',txn:34,conf:72},
+      {id:'ACC-3301',score:48,cls:'sus',pt:'42%',age:'8mo',kyc:'Verified',txn:28,conf:68},
+      {id:'ACC-2240',score:42,cls:'sus',pt:'38%',age:'5mo',kyc:'Partial',txn:22,conf:64},
+    ],
+    mule:[
+      {id:'ACC-8821',score:94,cls:'mule',pt:'88%',age:'2mo',kyc:'Partial',txn:82,conf:97},
+      {id:'ACC-7340',score:91,cls:'mule',pt:'82%',age:'1mo',kyc:'Unverified',txn:126,conf:96},
+      {id:'ACC-9012',score:88,cls:'mule',pt:'76%',age:'3mo',kyc:'Partial',txn:64,conf:94},
+      {id:'ACC-6654',score:84,cls:'mule',pt:'71%',age:'4mo',kyc:'Verified',txn:48,conf:91},
+    ],
+    suspicious:[
+      {id:'ACC-4812',score:54,cls:'sus',pt:'46%',age:'6mo',kyc:'Partial',txn:34,conf:72},
+      {id:'ACC-3301',score:48,cls:'sus',pt:'42%',age:'8mo',kyc:'Verified',txn:28,conf:68},
+      {id:'ACC-2240',score:42,cls:'sus',pt:'38%',age:'5mo',kyc:'Partial',txn:22,conf:64},
+    ],
+    legit:[],
+    rf: [{id:'ACC-8821',score:95,cls:'mule',pt:'88%',age:'2mo',kyc:'Partial',txn:82,conf:98},{id:'ACC-7340',score:92,cls:'mule',pt:'82%',age:'1mo',kyc:'Unverified',txn:126,conf:97}],
+    lr: [{id:'ACC-8821',score:88,cls:'mule',pt:'88%',age:'2mo',kyc:'Partial',txn:82,conf:91},{id:'ACC-9012',score:82,cls:'mule',pt:'76%',age:'3mo',kyc:'Partial',txn:64,conf:88}],
+    dt: [{id:'ACC-7340',score:90,cls:'mule',pt:'82%',age:'1mo',kyc:'Unverified',txn:126,conf:93},{id:'ACC-8821',score:86,cls:'mule',pt:'88%',age:'2mo',kyc:'Partial',txn:82,conf:90}],
+    svm:[{id:'ACC-8821',score:86,cls:'mule',pt:'88%',age:'2mo',kyc:'Partial',txn:82,conf:89},{id:'ACC-6654',score:80,cls:'mule',pt:'71%',age:'4mo',kyc:'Verified',txn:48,conf:85}],
+  }
+};
+
+// Chart instances
+const cTrend=new Chart('cTrend',{type:'line',data:{labels:[],datasets:[]},options:{...OPT,plugins:{legend:LEG},scales:SCALE}});
+const cDist =new Chart('cDist', {type:'doughnut',data:{labels:['Mule','Suspicious','Legitimate'],datasets:[{data:[],backgroundColor:['rgba(255,77,109,0.85)','rgba(255,209,102,0.85)','rgba(0,212,255,0.85)'],borderWidth:0}]},options:{...OPT,cutout:'60%',plugins:{legend:LEG}}});
+const cFeat =new Chart('cFeat', {type:'bar',data:{labels:[],datasets:[]},options:{...OPT,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{...SCALE.x},y:{...SCALE.y}}}});
+const cModel=new Chart('cModel',{type:'bar',data:{labels:[],datasets:[]},options:{...OPT,plugins:{legend:LEG},scales:SCALE}});
+const cRisk =new Chart('cRisk', {type:'bar',data:{labels:[],datasets:[]},options:{...OPT,plugins:{legend:LEG},scales:{...SCALE,y:{...SCALE.y,stacked:true}}}});
+const cAge  =new Chart('cAge',  {type:'line',data:{labels:[],datasets:[]},options:{...OPT,plugins:{legend:{display:false}},scales:SCALE}});
+const cROC  =new Chart('cROC',  {type:'line',data:{labels:[],datasets:[]},options:{...OPT,plugins:{legend:{display:false}},scales:{x:{display:false},y:{display:false}}}});
+const cInd  =new Chart('cIndicators',{type:'bar',data:{labels:[],datasets:[]},options:{...OPT,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{...SCALE.x},y:{...SCALE.y}}}});
+
+function update(){
+  const model =document.getElementById('f_model').value;
+  const period=document.getElementById('f_period').value;
+  const risk  =document.getElementById('f_risk').value;
+  const kk=risk!=='all'?risk:(model!=='all'?model:(period!=='all'?period:'all'));
+
+  // KPIs
+  const kd=DB.kpi[kk]||DB.kpi.all;
+  document.getElementById('k1').textContent=kd.total.toLocaleString();
+  document.getElementById('k2').textContent=kd.mules.toLocaleString();
+  document.getElementById('k2s').textContent=((kd.mules/kd.total)*100).toFixed(1)+'% of total';
+  document.getElementById('k3').textContent=kd.sus.toLocaleString();
+  document.getElementById('k3s').textContent=((kd.sus/kd.total)*100).toFixed(1)+'% flagged';
+  document.getElementById('k4').textContent=kd.acc;
+  document.getElementById('k5').textContent=kd.fraud;
+
+  // Trend
+  const tk=period!=='all'?period:'all';
+  const td=DB.trend[tk]||DB.trend.all;
+  const tl=DB.trendLabels[tk]||DB.trendLabels.all;
+  cTrend.data.labels=tl;
+  cTrend.data.datasets=[
+    {label:'Mule Detected',data:td.mule,borderColor:'rgba(255,77,109,0.9)',backgroundColor:'rgba(255,77,109,0.08)',tension:0.4,fill:true,pointRadius:4},
+    {label:'Suspicious',   data:td.sus, borderColor:'rgba(255,209,102,0.9)',backgroundColor:'rgba(255,209,102,0.06)',tension:0.4,fill:true,pointRadius:4},
+  ];
+  cTrend.update();
+
+  // Distribution
+  const dk=risk!=='all'?risk:(model!=='all'?model:(period!=='all'?period:'all'));
+  cDist.data.datasets[0].data=DB.dist[dk]||DB.dist.all;
+  cDist.update();
+
+  // Feature importance
+  const fk=model!=='all'?model:'all';
+  const fd=DB.feat[fk]||DB.feat.all;
+  cFeat.data.labels=fd.labels;
+  cFeat.data.datasets=[{data:fd.vals.map(v=>Math.round(v*100)),backgroundColor:'rgba(0,212,255,0.7)',borderRadius:4}];
+  cFeat.update();
+
+  // Model comparison
+  cModel.data.labels=DB.modelPerf.labels;
+  cModel.data.datasets=[
+    {label:'Accuracy', data:DB.modelPerf.accuracy, backgroundColor:'rgba(0,212,255,0.7)', borderRadius:3},
+    {label:'Precision',data:DB.modelPerf.precision,backgroundColor:'rgba(0,255,157,0.7)', borderRadius:3},
+    {label:'Recall',   data:DB.modelPerf.recall,   backgroundColor:'rgba(255,209,102,0.7)',borderRadius:3},
+    {label:'F1 Score', data:DB.modelPerf.f1,        backgroundColor:'rgba(255,77,109,0.7)', borderRadius:3},
+  ];
+  cModel.options.scales.y={...SCALE.y,min:80,max:100};
+  cModel.update();
+
+  // Risk distribution
+  const rk=risk!=='all'?risk:'all';
+  const rd=DB.risk[rk]||DB.risk.all;
+  cRisk.data.labels=rd.labels;
+  cRisk.data.datasets=[
+    {label:'Legitimate',data:rd.legit,backgroundColor:'rgba(0,212,255,0.5)',stack:'s'},
+    {label:'Mule',      data:rd.mule, backgroundColor:'rgba(255,77,109,0.8)',stack:'s'},
+  ];
+  cRisk.update();
+
+  // Account age
+  const ad=DB.age.all;
+  cAge.data.labels=ad.labels;
+  cAge.data.datasets=[{data:ad.muleRate,label:'Mule Rate %',borderColor:'rgba(255,77,109,0.9)',backgroundColor:'rgba(255,77,109,0.1)',tension:0.4,fill:true,pointRadius:5,pointBackgroundColor:'rgba(255,77,109,1)'}];
+  cAge.update();
+
+  // ROC
+  const rocMap={rf:[0,0.02,0.06,0.12,0.22,0.38,0.58,0.78,0.90,0.96,1],lr:[0,0.04,0.10,0.20,0.34,0.52,0.70,0.84,0.93,0.97,1],dt:[0,0.03,0.08,0.16,0.28,0.46,0.64,0.80,0.91,0.96,1],svm:[0,0.05,0.12,0.22,0.36,0.54,0.72,0.86,0.94,0.97,1]};
+  const roc=model!=='all'?rocMap[model]:[0,0.01,0.04,0.10,0.20,0.36,0.56,0.76,0.89,0.96,1];
+  cROC.data.labels=[0,.1,.2,.3,.4,.5,.6,.7,.8,.9,1];
+  cROC.data.datasets=[
+    {data:roc,borderColor:'rgba(0,255,157,0.9)',backgroundColor:'rgba(0,255,157,0.06)',tension:0.3,fill:true,pointRadius:0},
+    {data:[0,.1,.2,.3,.4,.5,.6,.7,.8,.9,1],borderColor:'rgba(107,122,141,0.3)',borderDash:[4,4],pointRadius:0},
+  ];
+  cROC.update();
+
+  // Confusion matrix
+  const cmk=model!=='all'?model:'all';
+  const cmd=DB.cm[cmk]||DB.cm.all;
+  document.getElementById('cmTP').textContent=cmd.tp.toLocaleString();
+  document.getElementById('cmFN').textContent=cmd.fn.toLocaleString();
+  document.getElementById('cmFP').textContent=cmd.fp.toLocaleString();
+  document.getElementById('cmTN').textContent=cmd.tn.toLocaleString();
+  document.getElementById('cmSub').textContent=cmd.label;
+
+  // Metrics
+  const mk=model!=='all'?model:'all';
+  const md=DB.metrics[mk]||DB.metrics.all;
+  document.getElementById('mAcc').textContent=md.acc;
+  document.getElementById('mPre').textContent=md.pre;
+  document.getElementById('mRec').textContent=md.rec;
+  document.getElementById('mF1').textContent=md.f1;
+  document.getElementById('metSub').textContent=md.label+' performance';
+
+  // Indicators
+  const ik=risk!=='all'?risk:'all';
+  const id2=DB.indicators[ik]||DB.indicators.all;
+  cInd.data.labels=id2.labels;
+  cInd.data.datasets=[{data:id2.vals,backgroundColor:'rgba(255,77,109,0.7)',borderRadius:4}];
+  cInd.update();
+
+  // Flagged table
+  const rowKey=risk!=='all'?risk:(model!=='all'?model:'all');
+  const rows=DB.rows[rowKey]||DB.rows.all;
+  const clsLabel={mule:'MULE',sus:'SUSPICIOUS',legit:'LEGIT'};
+  const clsCss={mule:'mule',sus:'sus',legit:'legit'};
+  document.getElementById('flaggedTbl').innerHTML=rows.length
+    ?rows.map(r=>`<tr>
+        <td style="font-family:'Space Mono',monospace;font-size:0.78rem;color:var(--accent)">${r.id}</td>
+        <td><span style="font-family:'Bebas Neue';font-size:1.1rem;color:${r.score>=60?'var(--red)':r.score>=35?'var(--yellow)':'var(--accent2)'}">${r.score}</span></td>
+        <td><span class="tag ${clsCss[r.cls]}">${clsLabel[r.cls]}</span></td>
+        <td>${r.pt}</td><td>${r.age}</td><td>${r.kyc}</td><td>${r.txn}</td>
+        <td><div style="display:inline-flex;align-items:center;gap:6px;">${r.conf}%
+          <div class="conf-bar-bg"><div class="conf-bar" style="width:${r.conf}%;background:${r.score>=60?'var(--red)':r.score>=35?'var(--yellow)':'var(--accent2)'}"></div></div>
+        </div></td>
+      </tr>`).join('')
+    :'<tr><td colspan="8" style="text-align:center;padding:1.5rem;color:var(--muted);font-family:Space Mono,monospace;font-size:0.75rem">No flagged accounts for selected filters</td></tr>';
+}
+
+['f_model','f_period','f_risk'].forEach(id=>document.getElementById(id).addEventListener('change',update));
+update();
+</script>
+</body>
+</html>
