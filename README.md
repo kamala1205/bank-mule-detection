@@ -10,7 +10,7 @@ This project is developed as part of the **MCA Final Year Project**.
 ## 🚀 Live Demo
 
 🔗 Live App:
-https://kamala1205-bank-mule-detection-streamlit-app.streamlit.app
+[https://kamala1205-bank-mule-detection-streamlit-app.streamlit.app](https://kamala1205-bank-mule-detection-streamlit-app-y17tms.streamlit.app/)
 
 🔗 Portfolio:
 https://kamala1205.github.io
